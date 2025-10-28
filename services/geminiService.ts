@@ -5,24 +5,21 @@
 import { GoogleGenAI } from "@google/genai";
 import type { GenerateContentResponse } from "@google/genai";
 
-const API_KEY = process.env.API_KEY;
-
-if (!API_KEY) {
-  throw new Error("API_KEY environment variable is not set");
-}
-
-const ai = new GoogleGenAI({ apiKey: API_KEY });
-
+type GenerationMode = 'ethnicities' | 'creative';
 
 // --- Helper Functions ---
 
 /**
  * Creates a fallback prompt to use when the primary one is blocked.
- * @param ethnicityName The name of the ethnicity (e.g., "East Asian").
+ * @param themeName The name of the theme (e.g., "East Asian" or "Cyborg").
+ * @param mode The generation mode to determine the fallback style.
  * @returns The fallback prompt string.
  */
-function getEthnicityFallbackPrompt(ethnicityName: string): string {
-    return `Create a high-quality, respectful portrait photograph of the person from the provided image, reimagined as ethnically ${ethnicityName}. The final image should preserve the person's core identity.`;
+function getFallbackPrompt(themeName: string, mode: GenerationMode): string {
+    if (mode === 'ethnicities') {
+        return `Create a high-quality, respectful portrait photograph of the person from the provided image, reimagined as ethnically ${themeName}. The final image should preserve the person's core identity.`;
+    }
+    return `Create a high-quality, respectful portrait of the person from the image, reimagined in the style of: ${themeName}. Preserve the person's core identity.`;
 }
 
 /**
@@ -50,6 +47,14 @@ function processGeminiResponse(response: GenerateContentResponse): string {
  * @returns The GenerateContentResponse from the API.
  */
 async function callGeminiWithRetry(imagePart: object, textPart: object): Promise<GenerateContentResponse> {
+    const API_KEY = process.env.API_KEY;
+
+    if (!API_KEY) {
+      throw new Error("API_KEY environment variable is not set. Please configure it in your Vercel project settings.");
+    }
+    
+    const ai = new GoogleGenAI({ apiKey: API_KEY });
+    
     const maxRetries = 3;
     const initialDelay = 1000;
 
@@ -79,14 +84,15 @@ async function callGeminiWithRetry(imagePart: object, textPart: object): Promise
 
 
 /**
- * Generates an ethnicity-styled portrait from a source image and a prompt.
+ * Generates a transformed portrait from a source image, prompt, and theme.
  * It includes a fallback mechanism for prompts that might be blocked.
  * @param imageDataUrl A data URL string of the source image (e.g., 'data:image/png;base64,...').
  * @param prompt The prompt to guide the image generation.
- * @param ethnicityName The name of the ethnicity, used for the fallback prompt.
+ * @param themeName The name of the theme, used for the fallback prompt.
+ * @param mode The generation mode, used to select the correct fallback prompt.
  * @returns A promise that resolves to a base64-encoded image data URL of the generated image.
  */
-export async function generateEthnicityImage(imageDataUrl: string, prompt: string, ethnicityName: string): Promise<string> {
+export async function generateTransformedImage(imageDataUrl: string, prompt: string, themeName: string, mode: GenerationMode): Promise<string> {
   const match = imageDataUrl.match(/^data:(image\/\w+);base64,(.*)$/);
   if (!match) {
     throw new Error("Invalid image data URL format. Expected 'data:image/...;base64,...'");
@@ -99,7 +105,7 @@ export async function generateEthnicityImage(imageDataUrl: string, prompt: strin
 
     // --- First attempt with the original prompt ---
     try {
-        console.log("Attempting generation with original prompt...");
+        console.log(`Attempting generation for "${themeName}" with original prompt...`);
         const textPart = { text: prompt };
         const response = await callGeminiWithRetry(imagePart, textPart);
         return processGeminiResponse(response);
@@ -108,12 +114,12 @@ export async function generateEthnicityImage(imageDataUrl: string, prompt: strin
         const isNoImageError = errorMessage.includes("The AI model responded with text instead of an image");
 
         if (isNoImageError) {
-            console.warn("Original prompt was likely blocked. Trying a fallback prompt.");
+            console.warn(`Original prompt for "${themeName}" was likely blocked. Trying a fallback prompt.`);
             
             // --- Second attempt with the fallback prompt ---
             try {
-                const fallbackPrompt = getEthnicityFallbackPrompt(ethnicityName);
-                console.log(`Attempting generation with fallback prompt for ${ethnicityName}...`);
+                const fallbackPrompt = getFallbackPrompt(themeName, mode);
+                console.log(`Attempting generation with fallback prompt for ${themeName}...`);
                 const fallbackTextPart = { text: fallbackPrompt };
                 const fallbackResponse = await callGeminiWithRetry(imagePart, fallbackTextPart);
                 return processGeminiResponse(fallbackResponse);

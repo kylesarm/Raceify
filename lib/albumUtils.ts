@@ -17,9 +17,15 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 /**
  * Creates a single "photo album" page image from a collection of generated images.
  * @param imageData A record mapping strings (e.g., ethnicity) to their image data URLs.
+ * @param subtitle The text to display below the main title.
+ * @param themes An ordered array of theme names to ensure consistent layout.
  * @returns A promise that resolves to a data URL of the generated album page (JPEG format).
  */
-export async function createAlbumPage(imageData: Record<string, string>): Promise<string> {
+export async function createAlbumPage(
+    imageData: Record<string, string>, 
+    subtitle: string,
+    themes: string[]
+): Promise<string> {
     const canvas = document.createElement('canvas');
     // High-resolution canvas for good quality (A4-like ratio)
     const canvasWidth = 2480;
@@ -45,15 +51,14 @@ export async function createAlbumPage(imageData: Record<string, string>): Promis
 
     ctx.font = `50px 'Roboto', sans-serif`;
     ctx.fillStyle = '#555';
-    ctx.fillText('A Journey Through Different Heritages', canvasWidth / 2, 220);
+    ctx.fillText(subtitle, canvasWidth / 2, 220);
 
     // 3. Load all the polaroid images concurrently
-    const keys = Object.keys(imageData);
     const loadedImages = await Promise.all(
-        Object.values(imageData).map(url => loadImage(url))
+        themes.map(theme => loadImage(imageData[theme]))
     );
 
-    const imagesWithKeys = keys.map((key, index) => ({
+    const imagesWithKeys = themes.map((key, index) => ({
         key,
         img: loadedImages[index],
     }));
