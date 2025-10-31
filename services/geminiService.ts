@@ -47,14 +47,7 @@ function processGeminiResponse(response: GenerateContentResponse): string {
  * @returns The GenerateContentResponse from the API.
  */
 async function callGeminiWithRetry(imagePart: object, textPart: object): Promise<GenerateContentResponse> {
-    // IMPORTANT: Vercel requires client-side variables to be prefixed with NEXT_PUBLIC_.
-    const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
-
-    if (!API_KEY) {
-      throw new Error("NEXT_PUBLIC_API_KEY environment variable is not set. Please configure it in your Vercel project settings.");
-    }
-    
-    const ai = new GoogleGenAI({ apiKey: API_KEY });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     const maxRetries = 3;
     const initialDelay = 1000;
